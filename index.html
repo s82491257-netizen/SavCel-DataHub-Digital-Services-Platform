@@ -1,0 +1,104 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SavCel DataHub - Data Bundles, WAEC, BECE, AI Tools</title>
+<script src="https://js.paystack.co/v1/inline.js"></script>
+<style>*{box-sizing:border-box;margin:0;padding:0;font-family:Inter,Arial}body{background:#faf5ff;color:#1f0a4a}
+header{background:#6d28d9;color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:20}
+header a{color:#fff;text-decoration:none;margin-left:10px;font-size:13px}
+.hero{background:linear-gradient(135deg,#6d28d9,#4c1d95);color:#fff;padding:35px 16px;text-align:center}
+.hero h1{font-size:30px;font-weight:800}.hero p{margin:8px 0;opacity:.9}
+.btn{padding:12px 18px;border-radius:999px;border:none;font-weight:700;cursor:pointer}
+.btn-white{background:#fff;color:#6d28d9}.btn-purple{background:#6d28d9;color:#fff;width:100%}
+.filters{background:#fff;padding:12px;display:flex;gap:8px;overflow:auto;position:sticky;top:54px;z-index:10;border-bottom:1px solid #e9d5ff}
+select,input{padding:11px;border-radius:10px;border:1px solid #ddd6fe;font-size:14px}
+.grid{display:grid;grid-template-columns:1fr;gap:12px;padding:14px}
+@media(min-width:700px){.grid{grid-template-columns:1fr 1fr 1fr}}
+.card{background:#fff;border-radius:16px;padding:16px;box-shadow:0 6px 18px rgba(109,40,217,.12);border:1px solid #ede9fe}
+.price{color:#059669;font-weight:800;font-size:19px;margin:6px 0}
+.badge{background:#f5f3ff;color:#6d28d9;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:14px;z-index:100}
+.modalBox{background:#fff;border-radius:16px;padding:18px;width:100%;max-width:420px;max-height:92vh;overflow:auto}
+footer{background:#2e1065;color:#fff;padding:18px;text-align:center;font-size:12px;margin-top:20px}
+</style></head><body>
+<header><b>SavCel DataHub</b><div><a href="#" onclick="openAuth('login')">Login</a><a href="#" onclick="openAuth('register')">Sign Up</a><a href="admin.html">Admin</a><a href="#" onclick="openDash()">My Orders</a></div></header>
+<div class="hero"><h1>SavCel DataHub</h1><p>Data Bundles • WAEC / BECE Checkers • AI Tools • Instant Delivery</p><p>Pay with Paystack in GHS • Agent Accounts Available</p><br><button class="btn btn-white" onclick="document.getElementById('products').scrollIntoView()">Browse Services</button></div>
+
+<div class="filters" id="products">
+<select id="fCat"><option value="">All Categories</option><option value="data">Data Bundles</option><option value="waec">WAEC</option><option value="bece">BECE</option><option value="ai_tool">AI Tools</option></select>
+<input id="fPhone" placeholder="Recipient Number (for data)">
+<button class="btn-purple" onclick="loadProducts()">Search</button>
+</div>
+
+<div id="grid" class="grid"></div>
+<div class="card" style="margin:14px"><h3>How It Works</h3><p style="font-size:13px;margin-top:6px">1. Choose product → 2. Enter recipient number → 3. Login/Register → 4. Pay with Paystack GHS → 5. Auto-verified → 6. Delivered instantly + track in My Orders. Agents earn commission.</p></div>
+
+<footer>© SavCel DataHub • Purple & White • Render + GitHub • Paystack GHS Verified<br>Admin: admin@savcel.com / Admin@123 (change after login)</footer>
+
+<div class="modal" id="authModal"><div class="modalBox"><h3 id="authTitle">Login</h3><br>
+<input id="uName" placeholder="Full Name (register only)" style="width:100%;margin-bottom:8px;display:none">
+<input id="uPhone" placeholder="Phone (register)" style="width:100%;margin-bottom:8px;display:none">
+<input id="uEmail" placeholder="Email" style="width:100%;margin-bottom:8px">
+<input id="uPass" type="password" placeholder="Password" style="width:100%;margin-bottom:8px">
+<button class="btn-purple" onclick="submitAuth()">Continue</button><br><br>
+<button onclick="closeModals()" style="width:100%;background:#f3f0ff;padding:10px;border-radius:10px;border:none">Close</button>
+<p id="authMsg" style="font-size:12px;color:red"></p></div></div>
+
+<div class="modal" id="dashModal"><div class="modalBox"><h3>My Orders & Tracking</h3><div id="agentBox" style="margin:10px 0"></div><div id="dashContent">Loading...</div><br>
+<button onclick="becomeAgent()" style="background:#ede9fe;padding:8px;border-radius:8px;border:none">Become Agent (Earn 5%)</button><br><br>
+<button onclick="closeModals()" style="width:100%;background:#f3f0ff;padding:10px;border-radius:10px;border:none">Close</button>
+<button onclick="logout()" style="width:100%;margin-top:8px;background:#000;color:#fff;padding:10px;border-radius:10px;border:none">Logout</button></div></div>
+
+<div class="modal" id="buyModal"><div class="modalBox"><h3>Checkout</h3><div id="buyContent"></div><br>
+<button id="payBtn" onclick="payWithPaystack()" class="btn-purple" style="background:#059669">Pay with Paystack GHS</button><br><br>
+<button onclick="closeModals()" style="width:100%;background:#f3f0ff;padding:10px;border-radius:10px;border:none">Cancel</button>
+<p id="payMsg" style="font-size:12px"></p></div></div>
+
+<script>
+let token=localStorage.getItem('savcel_token')||''; let orderRef=null; let orderAmount=0; let paystackKey=''; let authMode='login'; let selectedProd=null;
+async function init(){
+ try{const k=await fetch('/api/paystack/key'); const d=await k.json(); paystackKey=d.publicKey;}catch{}
+ loadProducts();
+}
+async function loadProducts(){
+ const cat=document.getElementById('fCat').value; let url='/api/products?'; if(cat) url+=`category=${cat}`;
+ const r=await fetch(url); const list=await r.json(); const grid=document.getElementById('grid');
+ if(!list.length){grid.innerHTML='<div class="card">No products yet. Admin can add in admin.html</div>'; return;}
+ grid.innerHTML=list.map(p=>`<div class="card"><div style="display:flex;justify-content:space-between"><b>${p.name}</b><span class="badge">${p.category.toUpperCase()}</span></div><div style="font-size:12px;color:#6b7280">${p.network||''} ${p.size_gb||''}</div><div style="font-size:12px;margin:6px 0">${p.description||''}</div><div class="price">GHS ${Number(p.price_ghs).toFixed(2)}</div><button class="btn-purple" style="margin-top:8px" onclick="buy(${p.id},'${p.name}',${p.price_ghs})">Buy Now</button></div>`).join('');
+}
+function openAuth(m){authMode=m; document.getElementById('authTitle').innerText=m==='login'?'Customer Login':'Create Account'; document.getElementById('uName').style.display=m==='register'?'block':'none'; document.getElementById('uPhone').style.display=m==='register'?'block':'none'; document.getElementById('authModal').style.display='flex';}
+function closeModals(){document.querySelectorAll('.modal').forEach(x=>x.style.display='none');}
+async function submitAuth(){
+ const name=document.getElementById('uName').value; const phone=document.getElementById('uPhone').value; const email=document.getElementById('uEmail').value; const password=document.getElementById('uPass').value;
+ const url=authMode==='login'?'/api/login':'/api/register'; const body=authMode==='login'?{email,password}:{name,email,phone,password};
+ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const d=await r.json();
+ if(d.token){localStorage.setItem('savcel_token',d.token); localStorage.setItem('savcel_user',JSON.stringify(d.user||{email})); token=d.token; closeModals(); alert('Success! Now click Buy again.');} else document.getElementById('authMsg').innerText=d.error||'Failed';
+}
+async function buy(id,name,price){
+ if(!localStorage.getItem('savcel_token')){openAuth('login'); return;}
+ const phone=document.getElementById('fPhone').value;
+ if(!phone){alert('Enter recipient number at top filter'); document.getElementById('fPhone').focus(); return;}
+ selectedProd=id; document.getElementById('buyContent').innerHTML=`<div class="card"><b>${name}</b><br>Recipient: ${phone}<br>Price: <b>GHS ${price}</b><br><small>Paystack will verify automatically</small></div>`; document.getElementById('buyModal').style.display='flex';
+ const r=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+localStorage.getItem('savcel_token')},body:JSON.stringify({product_id:id,phone_number:phone,quantity:1})});
+ const d=await r.json(); if(!d.reference){document.getElementById('payMsg').innerText=d.error; return;} orderRef=d.reference; orderAmount=d.amount; document.getElementById('payMsg').innerText=`Order ${orderRef} ready - GHS ${orderAmount}`;
+}
+async function payWithPaystack(){
+ if(!paystackKey){document.getElementById('payMsg').innerText='Add PAYSTACK_PUBLIC_KEY in Render Env'; return;}
+ const h=PaystackPop.setup({key:paystackKey,email:JSON.parse(localStorage.getItem('savcel_user')||'{}').email||document.getElementById('uEmail').value||'customer@savcel.com',amount:Math.round(Number(orderAmount)*100),currency:'GHS',ref:orderRef,
+ callback:async function(res){
+  document.getElementById('payMsg').innerText='Verifying...';
+  const v=await fetch('/api/paystack/verify',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+localStorage.getItem('savcel_token')},body:JSON.stringify({reference:res.reference})});
+  const vd=await v.json(); if(vd.order||vd.message){document.getElementById('payMsg').innerText='✅ Verified! Delivered. Check My Orders.'; setTimeout(()=>{closeModals(); openDash();},1200);} else document.getElementById('payMsg').innerText='Failed: '+(vd.error||'');
+ },
+ onClose:function(){document.getElementById('payMsg').innerText='Payment closed';}
+ }); h.openIframe();
+}
+async function openDash(){
+ if(!localStorage.getItem('savcel_token')){openAuth('login'); return;} document.getElementById('dashModal').style.display='flex';
+ const r=await fetch('/api/my/orders',{headers:{Authorization:'Bearer '+localStorage.getItem('savcel_token')}}); const orders=await r.json();
+ const a=await fetch('/api/my/agent',{headers:{Authorization:'Bearer '+localStorage.getItem('savcel_token')}}); const ag=await a.json();
+ document.getElementById('agentBox').innerHTML=ag?`<div class="card" style="background:#f5f3ff">Agent: ${ag.status} | Earnings: GHS ${Number(ag.total_earnings).toFixed(2)} | Rate: ${ag.commission_rate}%</div>`:'<div style="font-size:12px">Not an agent yet</div>';
+ document.getElementById('dashContent').innerHTML=orders.length===0?'No orders yet':orders.map(o=>`<div class="card" style="margin-bottom:8px"><b>${o.product_name}</b><br>${o.category} - ${o.phone_number}<br>GHS ${o.amount_ghs} - <b>${o.status}</b><br><small>${new Date(o.created_at).toLocaleString()}</small><br><small>Ref: ${o.paystack_ref}</small><br><small>${o.result||''}</small></div>`).join('');
+}
+async function becomeAgent(){const r=await fetch('/api/agent/apply',{method:'POST',headers:{Authorization:'Bearer '+localStorage.getItem('savcel_token')}}); const d=await r.json(); alert(d.message||'Agent approved'); openDash();}
+function logout(){localStorage.clear(); closeModals(); alert('Logged out');}
+init();
+</script></body></html>
