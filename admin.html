@@ -1,0 +1,48 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin - SavCel DataHub</title>
+<style>*{box-sizing:border-box;font-family:Arial}body{margin:0;background:#faf5ff}header{background:#4c1d95;color:#fff;padding:12px 16px;display:flex;justify-content:space-between}
+.card{background:#fff;border-radius:12px;padding:14px;margin:10px;box-shadow:0 4px 12px rgba(0,0,0,.06)}input,select,textarea{width:100%;padding:10px;margin:4px 0;border-radius:8px;border:1px solid #ddd6fe}
+button{padding:10px 14px;border-radius:8px;border:none;background:#6d28d9;color:#fff;font-weight:700}
+.grid{display:grid;grid-template-columns:1fr 1fr}table{width:100%;font-size:12px;border-collapse:collapse}th,td{padding:6px;border-bottom:1px solid #eee;text-align:left}
+</style></head><body>
+<header><b>SavCel Admin</b><a href="index.html" style="color:#fff">Home</a></header>
+<div id="login" class="card" style="max-width:400px;margin:40px auto"><h3>Admin Login</h3><input id="aEmail" placeholder="admin@savcel.com" value="admin@savcel.com"><input id="aPass" type="password" placeholder="Admin@123" value="Admin@123"><button onclick="login()">Login</button><p id="msg"></p></div>
+<div id="dash" style="display:none">
+<div class="grid"><div class="card"><b>Users</b><div id="sUsers">0</div></div><div class="card"><b>Products</b><div id="sProds">0</div></div><div class="card"><b>Orders</b><div id="sOrders">0</div></div><div class="card"><b>Revenue GHS</b><div id="sRev">0</div></div></div>
+
+<div class="card"><h3>Add New Product (Data / WAEC / BECE / AI Tool)</h3>
+<input id="pName" placeholder="Name e.g. MTN 20GB"><select id="pCat"><option value="data">Data Bundle</option><option value="waec">WAEC</option><option value="bece">BECE</option><option value="ai_tool">AI Tool</option><option value="other">Other</option></select>
+<input id="pNet" placeholder="Network e.g. MTN / Telecel / WAEC / AI"><input id="pSize" placeholder="Size e.g. 10GB / 1 PIN / 1 Month">
+<input id="pPrice" type="number" placeholder="Price GHS e.g. 45"><input id="pCost" type="number" placeholder="Cost Price"><textarea id="pDesc" placeholder="Description"></textarea>
+<button onclick="addProd()">Add Product</button></div>
+
+<div class="card"><h3>All Products</h3><div id="prodList"></div></div>
+<div class="card"><h3>Orders - Track</h3><div style="overflow:auto"><table><thead><tr><th>ID</th><th>User</th><th>Product</th><th>Phone</th><th>Amount</th><th>Status</th><th>Ref</th></tr></thead><tbody id="orderList"></tbody></table></div></div>
+<div class="card"><h3>Users</h3><div id="userList"></div></div>
+<div class="card"><h3>Agents</h3><div id="agentList"></div></div>
+<button onclick="logout()" style="margin:10px;background:#000">Logout</button>
+</div>
+
+<script>
+let token=localStorage.getItem('savcel_admin_token')||'';
+function login(){
+ const email=document.getElementById('aEmail').value; const password=document.getElementById('aPass').value;
+ fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})}).then(r=>r.json()).then(d=>{
+  if(d.token){localStorage.setItem('savcel_admin_token',d.token); token=d.token; document.getElementById('login').style.display='none'; document.getElementById('dash').style.display='block'; loadAll();}
+  else document.getElementById('msg').innerText=d.error;
+ });
+}
+function loadAll(){loadStats(); loadProds(); loadOrders(); loadUsers(); loadAgents();}
+async function loadStats(){const r=await fetch('/api/admin/stats',{headers:{Authorization:'Bearer '+token}}); const d=await r.json(); document.getElementById('sUsers').innerText=d.users; document.getElementById('sProds').innerText=d.products; document.getElementById('sOrders').innerText=d.orders; document.getElementById('sRev').innerText='GHS '+Number(d.revenue).toFixed(2);}
+async function loadProds(){const r=await fetch('/api/admin/products',{headers:{Authorization:'Bearer '+token}}); const list=await r.json(); document.getElementById('prodList').innerHTML=list.map(p=>`<div style="display:flex;justify-content:space-between;padding:6px;border-bottom:1px solid #eee"><span>${p.name} - GHS ${p.price_ghs} (${p.category})</span><button onclick="delProd(${p.id})" style="background:#ef4444">Delete</button></div>`).join('');}
+async function addProd(){
+ const body={name:document.getElementById('pName').value,category:document.getElementById('pCat').value,network:document.getElementById('pNet').value,size_gb:document.getElementById('pSize').value,price_ghs:document.getElementById('pPrice').value,cost_price:document.getElementById('pCost').value,description:document.getElementById('pDesc').value};
+ const r=await fetch('/api/admin/products',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body)}); const d=await r.json(); if(d.id){alert('Added'); loadProds(); loadStats();} else alert(d.error);
+}
+async function delProd(id){if(!confirm('Delete?')) return; await fetch('/api/admin/products/'+id,{method:'DELETE',headers:{Authorization:'Bearer '+token}}); loadProds();}
+async function loadOrders(){const r=await fetch('/api/admin/orders',{headers:{Authorization:'Bearer '+token}}); const list=await r.json(); document.getElementById('orderList').innerHTML=list.map(o=>`<tr><td>${o.id}</td><td>${o.user_email||''}</td><td>${o.product_name}</td><td>${o.phone_number}</td><td>${o.amount_ghs}</td><td>${o.status}</td><td>${o.paystack_ref}</td></tr>`).join('');}
+async function loadUsers(){const r=await fetch('/api/admin/users',{headers:{Authorization:'Bearer '+token}}); const list=await r.json(); document.getElementById('userList').innerHTML=list.map(u=>`${u.name} - ${u.email} - ${u.phone||''}<br>`).join('');}
+async function loadAgents(){const r=await fetch('/api/admin/agents',{headers:{Authorization:'Bearer '+token}}); const list=await r.json(); document.getElementById('agentList').innerHTML=list.map(a=>`${a.name} - ${a.email} - GHS ${Number(a.total_earnings).toFixed(2)} - ${a.status}<br>`).join('');}
+function logout(){localStorage.removeItem('savcel_admin_token'); location.reload();}
+if(token){document.getElementById('login').style.display='none'; document.getElementById('dash').style.display='block'; loadAll();}
+</script></body></html>
